@@ -1,0 +1,319 @@
+---
+title: "Untitled"
+author: "Musaab Farooqui"
+date: "8/13/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("stringr")
+library("tidyverse")
+data("social", package = "qss")
+```
+
+# 2 Causality
+
+## 2.1 Racial Discrimination in the Labor Market
+
+
+```{r}
+data("resume", package = "qss") 
+dim(resume)
+#dimensions of table (x,y)
+summary(resume)
+#summarizes table by class, character, length, and elemntary stats.  
+head(resume)
+#produces first six rows, add comma after resume to produce more. 
+```
+
+```{r}
+glimpse(resume)
+#names of columns, type of character, and gives numbers.
+```
+
+```{r}
+race_call_tab <- resume %>% 
+  group_by(race, call) %>% 
+  count() %>% 
+  ungroup()
+race_call_tab
+```
+
+```{r}
+race_call_rate <- race_call_tab %>% 
+  group_by(race) %>% 
+  mutate(call_rate = n/sum(n)) %>% 
+  filter(call == 1 ) %>% 
+  select(race, call_rate) 
+  race_call_rate
+```
+
+```{r}
+resume %>%
+  summarise(call_back = mean(call))
+```
+
+## 2.2 Subsetting Data in R
+
+```{r}
+resume %>% 
+  mutate(BlackFemale = if_else(race == "black" & sex == "female", 1, 0)) %>% 
+  group_by(BlackFemale, race, sex) %>% 
+  count()
+```
+
+```{r}
+class(1)
+class(1L)
+```
+
+```{r}
+class(1:5)
+class(c(1,2,3))
+class(as.integer(c(1,2,3)))
+```
+
+
+## 2.2.3 Factor Variables
+
+```{r}
+resume %>% 
+  mutate(
+    race_sex = case_when(
+      race == "black" & sex == "female" ~ "black female",
+      race == "white" & sex == "female" ~ "white female",
+      race == "black" & sex == "male" ~ "black male",
+      race == "white" & sex == "male" ~ "white male"
+    )
+  ) %>% 
+  head()
+```
+
+```{r}
+resume %>% 
+  mutate(
+    race_sex = case_when(
+      race == "black" & sex == "female" ~ "black female", 
+      race == "black" & sex == "male" ~ "black male", 
+      TRUE ~ "white"
+    )
+  ) %>% 
+  head()
+```
+
+```{r}
+resume %>% 
+  group_by(race, sex) %>% 
+  summarise(call = mean(call))
+```
+
+```{r}
+resume %>% 
+  group_by(firstname) %>% 
+  summarise(call = mean(call)) %>% 
+  arrange(call)
+```
+
+## 2.3 Causal Affects and the Counterfactual
+
+```{r}
+data("social", package = "qss")
+summary(social)
+```
+
+```{r}
+turnout_by_message <-
+  social %>%
+  group_by(messages) %>%
+  summarize(turnout = mean(primary2006))
+turnout_by_message
+```
+
+```{r}
+turnout_by_message %>% 
+  spread(messages, turnout) %>% 
+  mutate(diff_civic_duty = `Civic Duty` - Control, 
+         diff_Hawthorne = Hawthorne - Control, 
+         diff_Neighbors = Neighbors - Control) %>% 
+  select(matches("diff_"))
+```
+
+```{r}
+social %>% 
+  mutate(age = 2006 - yearofbirth) %>% 
+  group_by(messages) %>% 
+  summarise(primary2004 = mean (primary2004), 
+            age = mean(age),
+            hhisze = mean(hhsize))
+```
+
+```{r}
+social %>% 
+  mutate(age = 2006 - yearofbirth) %>% 
+  group_by (messages) %>% 
+  summarise_at(vars(primary2004, age, hhsize), funs(mean))
+```
+
+## 2.4 Observational Studies
+
+```{r}
+data("minwage", package = "qss")
+```
+
+```{r}
+glimpse(minwage)
+summary(minwage)
+```
+
+```{r}
+NJ_MINWAGE <- 5.05
+```
+
+```{r}
+minwage %>% 
+  count(location)
+```
+
+```{r}
+minwage <- 
+  mutate(minwage, state = str_sub(location, -2L))
+```
+
+```{r}
+minwage <- 
+  mutate(minwage, state = if_else(location == "PA", "PA", "NJ"))
+```
+
+```{r}
+minwage %>% 
+  group_by(state) %>% 
+  summarise(prop_after = mean(wageAfter < NJ_MINWAGE), prop_Before = mean(wageBefore < NJ_MINWAGE))
+```
+
+```{r}
+minwage <- 
+  minwage %>% 
+  mutate(totalAfter = fullAfter + partAfter, 
+         fullPropAfter = fullAfter / totalAfter)
+```
+
+
+```{r}
+full_prop_by_state <-
+  minwage %>%
+  group_by(state) %>%
+  summarise(fullPropAfter = mean(fullPropAfter))
+full_prop_by_state
+```
+
+```{r}
+chains_by_state <-
+  minwage %>% 
+  group_by(state) %>% 
+  count(chain) %>% 
+  mutate(prop = n / sum(n))
+```
+
+```{r}
+ggplot(chains_by_state, aes(x = chain, y = prop, colour = state)) +
+  geom_point() +
+  coord_flip()
+```
+
+```{r}
+full_prop_by_state_chain <-
+  minwage %>% 
+  group_by(state, chain) %>% 
+  summarise(fullPropAfter = mean(fullPropAfter))
+full_prop_by_state_chain
+```
+
+```{r}
+ggplot(full_prop_by_state_chain, 
+       aes(x = forcats::fct_reorder(chain, fullPropAfter),
+           y = fullPropAfter,
+           colour = state)) +
+geom_point() +
+coord_flip() +
+labs(x="chains")
+```
+
+```{r}
+full_prop_by_state %>% 
+  spread(state, fullPropAfter) %>% 
+  mutate(diff = NJ - PA)
+```
+
+```{r}
+minwage <- 
+  minwage %>% 
+  mutate(totalBefore = fullBefore + partBefore, 
+         fullPropBefore = fullBefore / totalBefore)
+```
+
+```{r}
+minwage %>% 
+  filter(state == "NJ") %>% 
+  summarise(diff = mean(fullPropAfter) - mean(fullPropBefore))
+```
+
+```{r}
+  minwage %>% 
+  group_by(state) %>% 
+  summarise(diff = mean(fullPropAfter) - mean(fullPropBefore)) %>% 
+  spread(state, diff) %>% 
+  mutate(diff_in_diff = NJ - PA)
+```
+
+```{r}
+full_prop_by_state <-
+  minwage %>% 
+  group_by(state) %>% 
+  summarise_at(vars(fullPropAfter, fullPropBefore), mean) %>% 
+  gather(period, fullProp, -state) %>% 
+  mutate(period = recode(period, fullPropAfter = 1, fullPropBefore = 0))
+full_prop_by_state
+```
+
+```{r}
+ggplot(full_prop_by_state, aes (x = period, y = fullProp, colour = state)) + 
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = c(0,1), labels = c("Before", "After"))
+```
+
+##2.5 Descriptive Statistics for a Single Variable
+
+```{r}
+minwage %>%
+  filter(state == "NJ") %>%
+  select(wageBefore, wageAfter) %>%
+  summary()
+```
+
+```{r}
+minwage %>% 
+  group_by(state) %>% 
+  summarise(wageAfter = IQR(wageAfter),
+            wageBefore = IQR(wageBefore))
+```
+
+```{r}
+minwage %>% 
+  group_by(state) %>% 
+  summarise(wageAfter_sd = sd(wageAfter),
+            wageAfter_var = var(wageAfter),
+            wageBefore_sd = sd(wageBefore),
+            wageBefore_var = var(wageBefore))
+```
+
+```{r}
+minwage %>% 
+  group_by(state) %>% 
+  summarise_at(vars(wageAfter, wageBefore), funs(sd, var))
+```
+
+
