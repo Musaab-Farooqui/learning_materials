@@ -1,0 +1,241 @@
+---
+title: "IMAI QSS CH3"
+author: "Musaab Farooqui"
+date: "8/17/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("tidyverse")
+library("forcats")
+library("broom")
+library("tidyr")
+```
+
+```{r loading data}
+data("afghan", package = "qss")
+data("afghan.village", package = "qss")
+```
+
+## Chapter 3.1: _"Measuring Civilian Victimization during wartime"_
+
+```{r summarize}
+afghan %>% 
+  select(age, educ.years, employed, income) %>% 
+  summary()
+```
+
+```{r}
+count(afghan, income)
+```
+
+```{r harmed residents}
+afghan %>% 
+  group_by(violent.exp.ISAF, violent.exp.taliban) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(prop = n /sum(n))
+```
+
+## Chapter 3.2: _"Handling Missing Data in R"_
+
+```{r missing rows}
+head(afghan$income, n = 10)
+head(is.na (afghan$income), n = 10)
+```
+
+```{r }
+summarise(afghan, 
+          n_missing = sum(is.na(income)),
+          p_missing = mean(is.na(income)))
+```
+
+```{r proportion}
+violent_exp_prop <- 
+  afghan %>% 
+  group_by(violent.exp.ISAF, violent.exp.taliban) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(prop = n / sum(n)) %>% 
+  select(-n)
+violent_exp_prop
+```
+
+```{r prop table reogranized}
+violent_exp_prop %>% 
+  spread(violent.exp.taliban, prop)
+```
+
+```{r remove missing values}
+drop_na(afghan) %>% head()
+```
+
+```{r multiple types of missing values}
+NA
+NA_integer_
+NA_real_
+NA_character_
+```
+
+```{r eval = FALSE}
+x <- 1:5
+class(x)
+if_else(x<3, x,NA)
+```
+
+```{r eval = FALSE}
+if_else(x < 3, x, NA_integer_)
+```
+
+## 3.3 Visualizing the Univariate Distribution
+
+### 3.3.1 Barplot
+
+```{r Civilian Vicitimzation by the ISAF Barplot}
+afghan <- 
+  afghan %>% 
+  mutate(violent.exp.ISAF.fct = 
+           fct_explicit_na(fct_recode(factor(violent.exp.ISAF), Harm = "1", "No Harm" = "0"), 
+                            "No response"))
+ggplot(afghan, aes(x = violent.exp.ISAF.fct, y = ..prop.., group = 1)) +
+  geom_bar() +
+  xlab("Proportion of respondents") +
+  ylab("Proportion of respondents") + 
+  ggtitle("Civilian Vicitimzation by the ISAF")
+```
+
+```{r}
+afghan <- 
+  afghan %>% 
+  mutate(violent.exp.taliban.fct = 
+           fct_explicit_na(fct_recode(factor(violent.exp.taliban), Harm = "1", "No Harm" = "0"),
+                           "No response"))
+
+ggplot(afghan, aes(x = violent.exp.ISAF, y = ..prop.., group = 1)) + 
+  geom_bar() +
+  xlab("Reponse category")+
+  ylab("Proportion of respondents") +
+  ggtitle("Civilian Vicitimzation by the Taliban")
+```
+
+```{r combined plot}
+select(afghan, violent.exp.ISAF, violent.exp.taliban) %>% 
+  gather(variable, value) %>% 
+  mutate(value = fct_explicit_na(fct_recode(factor(value),
+                Harm = "1", "No = Harm" = "0"),
+                "No response"), 
+  variable = recode(variable, 
+                      violent.exp.ISAF = "ISAF", 
+                      violent.exp.taliban = "Taliban")) %>%
+  ggplot(aes(x = value, y = ..prop.., group = 1)) + 
+  geom_bar() +
+  facet_wrap(~ variable, ncol = 1) + 
+  xlab("Response category") +
+  ylab("Proportion of respondents") +
+  ggtitle("Civilian Vicitimization")
+```
+
+```{r plots}
+violent_exp <-
+  afghan %>% 
+  select(violent.exp.ISAF, violent.exp.taliban) %>% 
+  gather(perpetrator, response) %>% 
+  mutate(perpetrator = str_replace(perpetrator, "violent\\.exp\\.",""),
+         perpetrator = str_replace(perpetrator, "taliban", "Taliban"),
+         response = fct_recode(factor(response), "No response"),   
+         response = fct_explicit_na(response, "No response"),
+         response = fct_relevel(response, c("No response", "No Harm"))) %>% 
+  count(perpetrator, response) %>% 
+  mutate(prop = n / sum(n))
+ggplot(violent_exp, aes(x = prop, y = response, color = perpetrator)) +
+  geom_point() +
+  scale_color_manual(values = c(ISAF = "green", Taliban = "black"))
+```
+
+
+### 3.3.2 Histogram
+
+```{r}
+ggplot(afghan, aes(x = age, y = ..density..)) +
+  geom_histogram(binwidth = 5, boundary = 0) +
+  scale_x_continuous(breaks = seq(20, 80, by = 10)) +
+  labs(title = "Distribution of respondent's age",
+       y = "Age", x = "Density")
+```
+
+```{r}
+ggplot(afghan, aes(x = educ.years, y = ..density..)) +
+  geom_histogram(binwidth = 1, center = 0) +
+  geom_vline(xintercept = median(afghan$educ.years),
+             color = "white", size = 2) +
+  annotate("text", x = median(afghan$educ.years),
+           y = 0.2, label = "median", hjust = 0) +
+  labs(title = "Distribution of respondent's education",
+       x = "Years of education",
+       y = "Density")
+```
+
+```{r}
+dens_plot <- ggplot(afghan, aes(x = age)) +
+  geom_density() +
+  scale_x_continuous(breaks = seq(20, 80, by = 10)) +
+  labs(title = "Distribution of respondent's age",
+       y = "Age", x = "Density")
+dens_plot
+```
+
+```{r}
+dens_plot + geom_rug(alpha = .2)
+```
+
+```{r geom Frequency polygons}
+ggplot(afghan, aes(x = age)) +
+  geom_freqpoly() + 
+  scale_x_continuous(breaks = seq(20, 80, by = 10)) +
+  labs(title = "Distribution of the respondent's age", y = "Age", x = "Density")
+```
+
+### 3.3.3 Boxplot 
+
+```{r}
+ggplot(afghan, aes(x =1, y = age)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(y = "Age", x = "", title = "Distribution of Age")
+```
+
+```{r}
+ggplot(afghan, aes(y = educ.years, x = province)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(x = "Province", y = "Years of education", 
+       title = "Education by Province")
+```
+
+```{r}
+afghan %>% 
+  group_by(province) %>% 
+  summarise(educ.years = mean(educ.years, na.rm = TRUE),
+            violent.exp.taliban =
+              mean(violent.exp.taliban, na.rm = TRUE),
+             violent.exp.ISAF = 
+               mean(violent.exp.ISAF, na.rm =TRUE)) %>% 
+            arrange(educ.years)
+```
+
+```{r}
+library(ggthemes)
+ggplot(afghan, aes(y = educ.years, x = province)) +
+  geom_tufteboxplot() +
+  coord_flip() +
+  labs(x = "Province", y = "Years of education", 
+    title = "Education by Province")
+```
+
+```{r}
+ggplot(afghan, aes(y = educ.years, x = province)) +
+  geom_violin() +
+  coord_flip() +
+  labs(x= "Province", y = "Years of education", title = "Education by Province")
+```
+
