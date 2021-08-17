@@ -1,0 +1,53 @@
+---
+title: "Coding practice"
+author: "Musaab Farooqui"
+date: "8/13/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup}
+news <- read.csv("~/newspaper_2.csv")
+view(newspaper_2)
+```
+
+```{r}
+out_by_treat <- tapply(news$vote_lab_97, news$to_labour_mean)
+ate <- out_by_treat[2] - out_by_treat[1]
+ate
+```
+
+```{r}
+plab_by_treat <- tapply(news$parent_labour, news$to_labour, mean)
+
+treated <- subset(news, subset = to_labour == 1)
+control <- subset(news, subset = to_labour == 0)
+
+trt_by_plab <- tapply(treated$vote_lab_97, treated$parent_labour, mean)
+ctr_by_plab <- tapply(control$vote_lab_97, control$parent_labour, mean)
+
+ate_by_plab <- trt_by_plab = ctr_by_plab
+ate_by_plab
+```
+
+```{r pannel}
+before_after <- mean(treated$vote_lab_97) - 
+mean(treated$vote_lab_92)
+before_after
+
+control_bef_aft <- mean(control$vote_lab_97) - mean(control$vote_lab_92)
+control_bef_aft
+
+diff_in_diff <- before_after - control_bef_aft
+diff_in_diff
+```
+
+```{r}
+summary(treated$age) #do I need $?
+summary(control$age) #^
+
+sd(treated$age) #do I need $?
+sd(control$age) #^
+```
+
