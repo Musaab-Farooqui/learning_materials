@@ -1,0 +1,86 @@
+---
+title: "Blackwell Coding Practice 08/23/2021"
+author: "Musaab Farooqui"
+date: "8/17/2021"
+output: pdf_document
+---
+
+#loads data into 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+vignettes <- read.csv("vignettes.csv")
+```
+
+```{r}
+china <- subset(vignettes, china == 1)
+
+ch_props <- prop.table(table(china$self))
+labs <- c("None", "Little", "Some",
+           "A lot", "Unlimited")
+
+barplot(ch_props, names.arg = labs,
+  border = NA, col = "steelblue2",
+  las = 1,
+  main = "Own Political Efficacy (China)",
+  xlab = "Political Efficacy Score",
+  ylab = "Proportion of Respondents")
+```
+
+```{r}
+mexico <- subset(vignettes, subset = china == 0)
+
+mx_props <- prop.table(table(mexico$self))
+labs <- c("None", "Little", "Some",
+"A lot", "Unlimited")
+
+barplot(mx_props, names.arg = labs,
+  border = NA, col = "steelblue2",
+  las = 1,
+  main = "Own Political Efficacy (Mexico)",
+  xlab = "Political Efficacy Score",
+  ylab = "Proportion of Respondents")
+```
+
+```{r}
+hist(china$age,
+  freq = FALSE,
+  xlab = "Age",
+  main = "Respondent age (China)",
+  col = "steelblue2",
+  border = "white",
+  las = 1)
+```
+
+```{r}
+mean(china$self < china$moses)
+mean(mexico$self < mexico$moses)
+```
+
+```{r}
+ch_right <- subset(china, alison >= jane & jane >= moses)
+
+ch_right$self.adj <- NA
+ch_right$self.adj[ch_right$self < ch_right$moses] <- 1
+ch_right$self.adj[ch_right$self >= ch_right$moses &
+                  ch_right$self < ch_right$jane] <- 2
+ch_right$self.adj[ch_right$self >= ch_right$jane &
+                  ch_right$self < ch_right$alison] <- 3
+ch_right$self.adj[ch_right$self >= ch_right$alison] <- 4
+
+ch_props_adj <- prop.table(table(ch_right$self.adj))
+```
+
+```{r}
+mx_right <- subset(mexico, alison >= jane & jane >= moses)
+
+mx_right$self.adj <- NA
+mx_right$self.adj[mx_right$self < mx_right$moses] <- 1
+mx_right$self.adj[mx_right$self >= mx_right$moses &
+                  mx_right$self < mx_right$jane] <- 2
+mx_right$self.adj[mx_right$self >= mx_right$jane &
+                 mx_right$self < mx_right$alison] <- 3
+mx_right$self.adj[mx_right$self >= mx_right$alison] <- 4
+
+mx_props_adj <- prop.table(table(mx_right$self.adj))
+```
+
