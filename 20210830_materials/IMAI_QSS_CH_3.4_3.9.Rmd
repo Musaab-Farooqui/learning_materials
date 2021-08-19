@@ -1,0 +1,516 @@
+---
+title: "IMAI QSS CH3"
+author: "Musaab Farooqui"
+date: "8/17/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library("tidyverse")
+library("forcats")
+library("broom")
+library("tidyr")
+```
+
+```{r loading data}
+data("afghan", package = "qss")
+data("afghan.village", package = "qss")
+```
+
+## Chapter 3.1: _"Measuring Civilian Victimization during wartime"_
+
+```{r summarize}
+afghan %>% 
+  select(age, educ.years, employed, income) %>% 
+  summary()
+```
+
+```{r}
+count(afghan, income)
+```
+
+```{r harmed residents}
+afghan %>% 
+  group_by(violent.exp.ISAF, violent.exp.taliban) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(prop = n /sum(n))
+```
+
+## Chapter 3.2: _"Handling Missing Data in R"_
+
+```{r missing rows}
+head(afghan$income, n = 10)
+head(is.na (afghan$income), n = 10)
+```
+
+```{r }
+summarise(afghan, 
+          n_missing = sum(is.na(income)),
+          p_missing = mean(is.na(income)))
+```
+
+```{r proportion}
+violent_exp_prop <- 
+  afghan %>% 
+  group_by(violent.exp.ISAF, violent.exp.taliban) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(prop = n / sum(n)) %>% 
+  select(-n)
+violent_exp_prop
+```
+
+```{r prop table reogranized}
+violent_exp_prop %>% 
+  spread(violent.exp.taliban, prop)
+```
+
+```{r remove missing values}
+drop_na(afghan) %>% head()
+```
+
+```{r multiple types of missing values}
+NA
+NA_integer_
+NA_real_
+NA_character_
+```
+
+```{r eval = FALSE}
+x <- 1:5
+class(x)
+if_else(x<3, x,NA)
+```
+
+```{r eval = FALSE}
+if_else(x < 3, x, NA_integer_)
+```
+
+## 3.3 Visualizing the Univariate Distribution
+
+### 3.3.1 Barplot
+
+```{r Civilian Vicitimzation by the ISAF Barplot}
+afghan <- 
+  afghan %>% 
+  mutate(violent.exp.ISAF.fct = 
+           fct_explicit_na(fct_recode(factor(violent.exp.ISAF), Harm = "1", "No Harm" = "0"), 
+                            "No response"))
+ggplot(afghan, aes(x = violent.exp.ISAF.fct, y = ..prop.., group = 1)) +
+  geom_bar() +
+  xlab("Proportion of respondents") +
+  ylab("Proportion of respondents") + 
+  ggtitle("Civilian Vicitimzation by the ISAF")
+```
+
+```{r}
+afghan <- 
+  afghan %>% 
+  mutate(violent.exp.taliban.fct = 
+           fct_explicit_na(fct_recode(factor(violent.exp.taliban), Harm = "1", "No Harm" = "0"),
+                           "No response"))
+
+ggplot(afghan, aes(x = violent.exp.ISAF, y = ..prop.., group = 1)) + 
+  geom_bar() +
+  xlab("Reponse category")+
+  ylab("Proportion of respondents") +
+  ggtitle("Civilian Vicitimzation by the Taliban")
+```
+
+```{r combined plot}
+select(afghan, violent.exp.ISAF, violent.exp.taliban) %>% 
+  gather(variable, value) %>% 
+  mutate(value = fct_explicit_na(fct_recode(factor(value),
+                Harm = "1", "No = Harm" = "0"),
+                "No response"), 
+  variable = recode(variable, 
+                      violent.exp.ISAF = "ISAF", 
+                      violent.exp.taliban = "Taliban")) %>%
+  ggplot(aes(x = value, y = ..prop.., group = 1)) + 
+  geom_bar() +
+  facet_wrap(~ variable, ncol = 1) + 
+  xlab("Response category") +
+  ylab("Proportion of respondents") +
+  ggtitle("Civilian Vicitimization")
+```
+
+```{r plots}
+violent_exp <-
+  afghan %>% 
+  select(violent.exp.ISAF, violent.exp.taliban) %>% 
+  gather(perpetrator, response) %>% 
+  mutate(perpetrator = str_replace(perpetrator, "violent\\.exp\\.",""),
+         perpetrator = str_replace(perpetrator, "taliban", "Taliban"),
+         response = fct_recode(factor(response), "No response"),   
+         response = fct_explicit_na(response, "No response"),
+         response = fct_relevel(response, c("No response", "No Harm"))) %>% 
+  count(perpetrator, response) %>% 
+  mutate(prop = n / sum(n))
+ggplot(violent_exp, aes(x = prop, y = response, color = perpetrator)) +
+  geom_point() +
+  scale_color_manual(values = c(ISAF = "green", Taliban = "black"))
+```
+
+
+### 3.3.2 Histogram
+
+```{r}
+ggplot(afghan, aes(x = age, y = ..density..)) +
+  geom_histogram(binwidth = 5, boundary = 0) +
+  scale_x_continuous(breaks = seq(20, 80, by = 10)) +
+  labs(title = "Distribution of respondent's age",
+       y = "Age", x = "Density")
+```
+
+```{r}
+ggplot(afghan, aes(x = educ.years, y = ..density..)) +
+  geom_histogram(binwidth = 1, center = 0) +
+  geom_vline(xintercept = median(afghan$educ.years),
+             color = "white", size = 2) +
+  annotate("text", x = median(afghan$educ.years),
+           y = 0.2, label = "median", hjust = 0) +
+  labs(title = "Distribution of respondent's education",
+       x = "Years of education",
+       y = "Density")
+```
+
+```{r}
+dens_plot <- ggplot(afghan, aes(x = age)) +
+  geom_density() +
+  scale_x_continuous(breaks = seq(20, 80, by = 10)) +
+  labs(title = "Distribution of respondent's age",
+       y = "Age", x = "Density")
+dens_plot
+```
+
+```{r}
+dens_plot + geom_rug(alpha = .2)
+```
+
+```{r geom Frequency polygons}
+ggplot(afghan, aes(x = age)) +
+  geom_freqpoly() + 
+  scale_x_continuous(breaks = seq(20, 80, by = 10)) +
+  labs(title = "Distribution of the respondent's age", y = "Age", x = "Density")
+```
+
+### 3.3.3 Boxplot 
+
+```{r}
+ggplot(afghan, aes(x =1, y = age)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(y = "Age", x = "", title = "Distribution of Age")
+```
+
+```{r}
+ggplot(afghan, aes(y = educ.years, x = province)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(x = "Province", y = "Years of education", 
+       title = "Education by Province")
+```
+
+```{r}
+afghan %>% 
+  group_by(province) %>% 
+  summarise(educ.years = mean(educ.years, na.rm = TRUE),
+            violent.exp.taliban =
+              mean(violent.exp.taliban, na.rm = TRUE),
+             violent.exp.ISAF = 
+               mean(violent.exp.ISAF, na.rm =TRUE)) %>% 
+            arrange(educ.years)
+```
+
+```{r}
+library(ggthemes)
+ggplot(afghan, aes(y = educ.years, x = province)) +
+  geom_tufteboxplot() +
+  coord_flip() +
+  labs(x = "Province", y = "Years of education", 
+    title = "Education by Province")
+```
+
+```{r}
+ggplot(afghan, aes(y = educ.years, x = province)) +
+  geom_violin() +
+  coord_flip() +
+  labs(x= "Province", y = "Years of education", title = "Education by Province")
+```
+
+## 3.4 Survey Sampling 
+
+```{r}
+data("afghan.village", package = "qss")
+```
+
+```{r}
+ggplot(afghan.village, aes(x = factor(village.surveyed,
+                                      labels = c("sampled", "non-sampled")),
+                           y = altitude)) +
+  geom_boxplot() +
+  labs(y = "Altitude (meter)", x = "") +
+  coord_flip()
+```
+
+```{r}
+ggplot(afghan.village, aes(x = factor(village.surveyed,
+                                      labels = c("sampled", "non-sampled")),
+                           y = log(population))) +
+  geom_boxplot() +
+  labs(y = "log(population)", x = "") +
+  coord_flip()
+```
+
+```{r}
+ggplot(afghan.village, aes(colour = factor(village.surveyed,
+                                      labels = c("sampled", "non-sampled")),
+                           x = log(population))) +
+  geom_density() +
+  geom_rug() +
+  labs(x = "log(population)", colour = "")
+```
+
+```{r}
+afghan %>%
+  group_by(province) %>%
+  summarise(ISAF = mean(is.na(violent.exp.ISAF)),
+            taliban = mean(is.na(violent.exp.taliban))) %>%
+  arrange(-ISAF)
+```
+
+```{r}
+(mean(filter(afghan, list.group == "ISAF")$list.response) -
+  mean(filter(afghan, list.group == "control")$list.response))
+```
+
+```{r}
+afghan %>%
+  group_by(list.response, list.group) %>%
+  count() %>%
+  glimpse() %>%
+  spread(list.group, n, fill = 0)
+```
+
+## 3.5 Measuring Political Polarization
+
+```{r}
+data("congress", package = "qss")
+```
+
+```{r}
+glimpse(congress)
+```
+
+```{r}
+q <-
+  congress %>%
+  filter(congress %in% c(80, 112),
+         party %in% c("Democrat", "Republican")) %>%
+  ggplot(aes(x = dwnom1, y = dwnom2, colour = party)) +
+  geom_point() +
+  facet_wrap(~ congress) +
+  coord_fixed() +
+  scale_y_continuous("racial liberalism/conservatism",
+                     limits = c(-1.5, 1.5)) +
+  scale_x_continuous("economic liberalism/conservatism",
+                     limits = c(-1.5, 1.5))
+```
+
+```{r}
+scale_colour_parties <-
+  scale_colour_manual(values = c(Democrat = "blue",
+                                 Republican = "red",
+                                 Other = "green"))
+q + scale_colour_parties
+```
+
+```{r}
+congress %>%
+  ggplot(aes(x = dwnom1, y = dwnom2, colour = party)) +
+  geom_point() +
+  facet_wrap(~ congress) +
+  coord_fixed() +
+  scale_y_continuous("racial liberalism/conservatism",
+                     limits = c(-2, 2)) +
+  scale_x_continuous("economic liberalism/conservatism",
+                     limits = c(-2, 2))
+```
+
+```{r}
+congress %>%
+  group_by(congress, party) %>%
+  summarise(dwnom1 = mean(dwnom1)) %>%
+  filter(party %in% c("Democrat", "Republican")) %>%
+  ggplot(aes(x = congress, y = dwnom1,
+             colour = fct_reorder2(party, congress, dwnom1))) +
+  geom_line() +
+  scale_colour_parties +
+  labs(y = "DW-NOMINATE score (1st Dimension)", x = "Congress",
+       colour = "Party")
+```
+
+```{r}
+party_means <-
+  congress %>%
+  filter(party %in% c("Democrat", "Republican")) %>%
+  group_by(party, congress) %>%
+  summarise(dwnom1 = mean(dwnom1),
+            dwnom2 = mean(dwnom2))
+
+party_endpoints <-
+  party_means %>%
+  filter(congress %in% c(min(congress), max(congress))) %>%
+  mutate(label = str_c(party, congress, sep = " - "))
+
+ggplot(party_means,
+         aes(x = dwnom1, y = dwnom2, color = party,
+             group = party)) +
+  geom_point() +
+  geom_path() +
+  ggrepel::geom_text_repel(data = party_endpoints,
+                           mapping = aes(label = congress),
+                           color = "black") +
+  scale_y_continuous("racial liberalism/conservatism") +
+  scale_x_continuous("economic liberalism/conservatism") +
+  scale_colour_parties
+```
+
+```{r}
+data("USGini", package = "qss")
+```
+
+```{r}
+ggplot(USGini, aes(x = year, y = gini)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Year", y = "Gini coefficient") +
+  ggtitle("Income Inequality")
+```
+
+```{r}
+party_polarization <-
+  congress %>%
+  group_by(congress, party) %>%
+  summarise(dwnom1 = mean(dwnom1)) %>%
+  filter(party %in% c("Democrat", "Republican")) %>%
+  spread(party, dwnom1) %>%
+  mutate(polarization = Republican - Democrat)
+party_polarization
+```
+
+```{r}
+ggplot(party_polarization, aes(x = congress, y = polarization)) +
+  geom_point() +
+  geom_line() + 
+  ggtitle("political polarization") +
+  labs(x = "year", y = "Republican median - Democractic median")
+```
+
+```{r}
+congress %>% 
+  filter(congress == 112, party %in% c("Republican", "Democrat")) %>% 
+  ggplot(aes(x = dwnom2, y = ..density..)) +
+  geom_histogram(bindwith = 0.2) +
+  facet_grid(party ~ .) +
+  labs(x = "racial liberalism/conservatism dimension")
+```
+
+```{r}
+party_qtiles <- tibble(
+  probs = seq(0, 1, by = 0.01),
+  Democrat = quantile(filter(congress, congress == 112,
+                             party == "Democrat")$dwnom2,
+         probs = probs),
+  Republican = quantile(filter(congress, congress == 112,
+                               party == "Republican")$dwnom2,
+         probs = probs)
+)
+party_qtiles
+```
+
+```{r}
+party_qtiles %>%
+  ggplot(aes(x = Democrat, y = Republican)) +
+  geom_point() +
+  geom_abline() +
+  coord_fixed()
+```
+
+## 3.6 Clustering
+
+```{r}
+k80two.out <-
+  kmeans(select(filter(congress, congress == 80),
+                       dwnom1, dwnom2),
+              centers = 2, nstart = 5)
+```
+
+```{r}
+congress80 <-
+  congress %>%
+  filter(congress == 80) %>%
+  mutate(cluster2 = factor(k80two.out$cluster))
+```
+
+```{r}
+k80two.out$centers
+```
+
+```{r}
+k80two.clusters <- tidy(k80two.out)
+k80two.clusters
+```
+
+```{r}
+ggplot() +
+  geom_point(data = congress80,
+             aes(x = dwnom1, y = dwnom2, colour = cluster2)) +
+  geom_point(data = k80two.clusters, mapping = aes(x = dwnom1, y = dwnom2))
+```
+
+```{r}
+congress80 %>%
+  group_by(party, cluster2) %>%
+  count()
+```
+
+```{r}
+k112two.out <-
+  kmeans(select(filter(congress, congress == 112),
+                dwnom1, dwnom2),
+         centers = 2, nstart = 5)
+congress112 <-
+  filter(congress, congress == 112) %>%
+  mutate(cluster2 = factor(k112two.out$cluster))
+k112two.clusters <- tidy(k112two.out)
+ggplot() +
+  geom_point(data = congress112,
+             mapping = aes(x = dwnom1, y = dwnom2, colour = cluster2)) +
+  geom_point(data = k112two.clusters,
+             mapping = aes(x = dwnom1, y = dwnom2))
+```
+
+```{r}
+congress112 %>% 
+  group_by(party, cluster2) %>% 
+  count()
+```
+
+```{r}
+k80four.out <-
+  kmeans(select(filter(congress, congress == 80),
+                dwnom1, dwnom2),
+         centers = 4, nstart = 5)
+congress80 <- 
+  filter(congress, congress == 80) %>% 
+  mutate(cluster2 = factor(k80four.out$cluster))
+k80four.clusters <- tidy(k80four.out)
+ggplot() +
+  geom_point(data = congress80,
+             mapping = aes(x = dwnom1, y = dwnom2, colour = cluster2)) +
+  geom_point(data = k80four.clusters, 
+             mapping = aes(x =dwnom1, y = dwnom2,), size = 3)
+```
+
